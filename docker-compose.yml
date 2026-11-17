@@ -1,0 +1,28 @@
+# Optional: MySQL 8 for MediSync Live. Docker is not required - see README "Manual MySQL setup".
+#   docker compose up -d
+services:
+  mysql:
+    image: mysql:8.0.36
+    container_name: medisync-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-medisync_root}
+      MYSQL_DATABASE: medisync_live
+      MYSQL_USER: ${DB_USERNAME:-medisync}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-medisync}
+      TZ: UTC
+    ports:
+      - "3306:3306"
+    command: ["--default-time-zone=+00:00"]
+    volumes:
+      - medisync-mysql-data:/var/lib/mysql
+      # Creates medisync_test and grants the app user on both schemas on first start.
+      - ./database/docker-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-medisync_root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  medisync-mysql-data:
