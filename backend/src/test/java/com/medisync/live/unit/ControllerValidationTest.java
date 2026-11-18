@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Bean Validation and error mapping, without a database. Invalid input never reaches the service. */
 @WebMvcTest(controllers = {EmergencyController.class, TransferController.class})
 @Import(TransactionRetryExecutor.class)
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(addFilters = false)
 class ControllerValidationTest {
 
     @Autowired
@@ -33,6 +34,8 @@ class ControllerValidationTest {
     EmergencyService emergencyService;
     @MockBean
     TransferService transferService;
+    @MockBean
+    com.medisync.live.security.AccessGuard accessGuard;
 
     @Test
     @DisplayName("Missing required emergency fields return 400 with one message per field")

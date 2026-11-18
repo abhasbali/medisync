@@ -20,6 +20,7 @@ public class InventoryController {
 
     private final InventoryService inventoryService;
     private final TransactionRetryExecutor retry;
+    private final com.medisync.live.security.AccessGuard guard;
 
     @Operation(summary = "All inventory rows")
     @GetMapping
@@ -36,6 +37,7 @@ public class InventoryController {
     @Operation(summary = "Update total and available units; extra free capacity is offered to the waiting queue")
     @PatchMapping("/{id}")
     public InventoryDto update(@PathVariable Long id, @Valid @RequestBody InventoryUpdateRequest body) {
+        guard.requireInventoryAccess(id);
         return retry.execute(() -> inventoryService.update(id, body));
     }
 }

@@ -38,6 +38,6 @@ public final class DtoMapper {
     }
 
     public static ActivityDto toDto(ActivityLog a) {
-        return new ActivityDto(a.getId(), a.getActionType(), a.getMessage(), a.getReferenceId(), a.getCreatedAt());
+        return new ActivityDto(a.getId(), a.getActionType(), a.getMessage(), a.getReferenceId(), a.getActor(), a.getCreatedAt());
     }
 }

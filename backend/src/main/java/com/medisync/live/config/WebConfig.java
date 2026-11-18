@@ -29,9 +29,16 @@ public class WebConfig implements WebMvcConfigurer {
     @Bean
     public OpenAPI medisyncOpenApi() {
         return new OpenAPI().info(new Info()
-                .title("MediSync Live API")
-                .version("1.0.0")
-                .description("Real-time hospital resource sharing and emergency bed allocation. "
-                        + "Academic prototype with synthetic data - not for clinical use."));
+                        .title("MediSync Live API")
+                        .version("1.0.0")
+                        .description("Real-time hospital resource sharing and emergency bed allocation. "
+                                + "Academic prototype with synthetic data - not for clinical use.\n\n"
+                                + "To call protected endpoints: run POST /api/auth/login, copy the token, "
+                                + "click Authorize and paste it."))
+                .components(new io.swagger.v3.oas.models.Components().addSecuritySchemes("bearer",
+                        new io.swagger.v3.oas.models.security.SecurityScheme()
+                                .type(io.swagger.v3.oas.models.security.SecurityScheme.Type.HTTP)
+                                .scheme("bearer").bearerFormat("JWT")))
+                .addSecurityItem(new io.swagger.v3.oas.models.security.SecurityRequirement().addList("bearer"));
     }
 }

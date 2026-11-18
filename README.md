@@ -12,23 +12,60 @@ This is a Java Spring Boot reimplementation of the project report *MediSync Live
 this one uses Spring Boot 3, Spring WebSocket/STOMP, MySQL 8 and React + TypeScript.
 
 > ⚠️ **Academic prototype.** All patient data is synthetic. Hospital capacities are demo values
-> taken from the report, not live hospital inventory. The app is not clinically validated and has
-> no login or role enforcement, so it must not be used for real emergency dispatch.
+> taken from the report, not live hospital inventory. The app is not clinically validated, so it
+> must not be used for real emergency dispatch.
 
 ---
+
+## Quick start (Windows, local MySQL)
+
+```bash
+# 1. MySQL must be running on localhost:3306 with user medisync / medisync (see "Installation" below)
+# 2. Backend  -> http://localhost:8080   (Swagger: /swagger-ui.html)
+cd backend && mvn spring-boot:run
+# 3. Frontend -> http://localhost:5173   (new terminal)
+cd frontend && npm install && npm run dev
+```
+
+Open http://localhost:5173 and sign in with a demo account (created on first start):
+
+| Username | Password | Role | Can do |
+|---|---|---|---|
+| `admin` | `Admin@123` | Administrator | Everything, plus user management (`/users`) |
+| `dispatcher` | `Dispatch@123` | Dispatcher | View everything; create / discharge / cancel emergency requests |
+| `staff1` … `staff6` | `Staff@123` | Hospital staff (one per hospital) | Emergency requests; edit **own** hospital inventory; request transfers for and approve/reject transfers to **own** hospital |
+
+Change these passwords (My account → Change password) before any shared use. Set `SEED_DEMO_USERS=false`
+to skip seeding, and `JWT_SECRET` (≥ 32 bytes) outside local development.
+
+## Authentication & authorisation
+
+* **JWT bearer tokens** (`POST /api/auth/login`, HS512, 8 h, `JWT_TTL`). Every `/api/**` endpoint except login requires a token; `/ws`, health and Swagger stay public.
+* **Roles** `ADMIN`, `DISPATCHER`, `HOSPITAL_STAFF`, enforced in `SecurityConfig`; hospital scoping for staff in `AccessGuard` (403 when acting on another hospital).
+* **BCrypt** password hashes, `app_users` table (Flyway `V3`).
+* **Token revocation**: changing/resetting a password, disabling a user or changing their role bumps `token_version`, so existing tokens stop working immediately.
+* **Brute-force lockout**: 5 failed logins lock that username for 5 minutes (HTTP 429).
+* **User management** (admin): create users, reset passwords, enable/disable — `GET/POST /api/users`, `PUT /api/users/{id}`, `POST /api/users/{id}/reset-password`.
+* **Self-service**: `GET /api/auth/me`, `POST /api/auth/change-password`.
+* **Audit actor**: every `activity_log` row records the username that caused it; the live feed shows "by &lt;user&gt;".
 
 ## Features
 
 | Area | What it does |
 |---|---|
-| **Live dashboard** | Summary cards: available/total, active admissions, waiting patients, average distance. One card per hospital with 5 colour-coded bars (green ≥ 40 % free, amber 15–40 %, red < 15 %), filters (hospital / resource / availability level), a capacity chart and a live activity feed. |
+| **Bed board** | KPI strip (free capacity, active admissions, waiting patients, average distance), a hospital × resource table with colour-coded meters (green ≥ 40 % free, amber 15–40 %, red < 15 %), filters (hospital / resource / availability level), a schematic **network map** (markers sized by capacity, coloured by free share, per-resource toggle), a capacity chart and a live activity log. |
+| **Analytics** | Allocation rate, median wait and transfer approval KPIs; charts for hourly request volume by severity, occupancy by hospital, median wait by severity, allocations and distance per hospital, demand by resource, capacity sharing (received vs lent) and requests by status. |
+| **Live alerts** | Toasts (optional sound) and a bell inbox for: a CRITICAL patient queued, a transfer request to your hospital, and any resource dropping below 15 % free (staff: own hospital only). |
+| **Role workspaces** | *Admin*: user management with account summary, searchable **audit log** with per-user chart and CSV export. *Dispatcher*: **capacity finder** ranking hospitals by distance and free beds for an area and resource. *Hospital staff*: **My hospital** page with own capacity, admitted patients and transfers. |
+| **CSV export** | Emergency requests, transfers and audit log export the current filtered view (Excel-friendly, formula-injection safe). |
 | **Emergency allocation** | Validated request form (area picker, *Use my location*, or manual coordinates). The nearest hospital with a free unit of the required type is found by Haversine distance, and one unit is reserved inside a locked transaction. |
 | **Priority queue** | Requests with no free bed are stored `PENDING` and served CRITICAL → SERIOUS → STABLE, first-come-first-served within a severity. Dispatch runs after discharge, cancellation, capacity increase and transfer approval. |
 | **Discharge / cancel** | Discharge or cancel releases the unit exactly once and serves the queue. Cancelling a pending request changes no counts. Invalid transitions return 409. |
 | **Resource sharing** | Hospital A requests N units from hospital B. The donor approves (one atomic transaction moves both total and available) or rejects (status only). Same-hospital, non-integer, ≤ 0, insufficient-stock and duplicate decisions are rejected. |
-| **Hospital admin** | Edit total/available per resource row. Available ≤ total is enforced, and occupied units can never drop below the patients currently allocated there. |
+| **Inventory** | Edit total/available per resource row. Available ≤ total is enforced, and occupied units can never drop below the patients currently allocated there. |
 | **Real time** | STOMP over WebSocket at `/ws`. Events are broadcast to `/topic/updates` **only after the transaction commits**. The UI shows Live / Reconnecting / Offline, auto-reconnects and reloads all data after reconnecting. |
-| **Audit** | Every request, allocation, queueing, release, edit and transfer decision is written to `activity_log` in the same transaction. |
+| **Audit** | Every request, allocation, queueing, release, edit, transfer decision and user-management action is written to `activity_log` in the same transaction, with the acting username. |
+| **Auth & roles** | JWT login, BCrypt, ADMIN / DISPATCHER / HOSPITAL_STAFF roles with per-hospital scoping, user management, password change, login lockout, token revocation. |
 
 ## Technology stack
 

@@ -27,6 +27,9 @@ public class ActivityLog {
     @Column(name = "reference_id")
     private Long referenceId;
 
+    @Column(length = 50)
+    private String actor;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -34,6 +37,7 @@ public class ActivityLog {
         this.actionType = actionType;
         this.message = message.length() > 500 ? message.substring(0, 500) : message;
         this.referenceId = referenceId;
+        this.actor = com.medisync.live.security.CurrentUser.username();
         this.createdAt = Instant.now();
     }
 }

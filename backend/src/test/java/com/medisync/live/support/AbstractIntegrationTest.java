@@ -31,6 +31,7 @@ import static org.mockito.Mockito.clearInvocations;
  * report's seed data: 6 hospitals, 30 inventory rows, 444 available of 1460.
  */
 @Tag("integration")
+@org.springframework.security.test.context.support.WithMockUser(username = "test-admin", roles = "ADMIN")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 public abstract class AbstractIntegrationTest {
