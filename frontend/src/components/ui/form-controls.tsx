@@ -3,11 +3,11 @@ import * as LabelPrimitive from "@radix-ui/react-label";
 import { cn } from "@/lib/utils";
 
 const fieldBase =
-  "flex w-full rounded-md border border-input bg-card px-3 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive/30";
+  "flex w-full rounded-sm border border-input bg-card px-2.5 text-[13px] transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive/30";
 
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   ({ className, type, ...props }, ref) => (
-    <input type={type} ref={ref} className={cn(fieldBase, "h-9 py-1", className)} {...props} />
+    <input type={type} ref={ref} className={cn(fieldBase, "h-8 py-1", className)} {...props} />
   ),
 );
 Input.displayName = "Input";
@@ -26,7 +26,7 @@ export const NativeSelect = React.forwardRef<HTMLSelectElement, React.SelectHTML
       ref={ref}
       className={cn(
         fieldBase,
-        "h-9 appearance-none bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2364748b' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")] bg-[right_0.6rem_center] bg-no-repeat pr-8",
+        "h-8 appearance-none bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2364748b' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")] bg-[right_0.6rem_center] bg-no-repeat pr-8",
         className,
       )}
       {...props}
@@ -43,7 +43,7 @@ export const Label = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <LabelPrimitive.Root
     ref={ref}
-    className={cn("text-sm font-medium leading-none text-slate-700 peer-disabled:opacity-70", className)}
+    className={cn("text-xs font-medium leading-none text-foreground/75 peer-disabled:opacity-70", className)}
     {...props}
   />
 ));

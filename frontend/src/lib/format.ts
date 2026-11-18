@@ -43,17 +43,17 @@ export function availabilityLevel(available: number, total: number): Availabilit
 }
 
 export const LEVEL_BAR_CLASS: Record<AvailabilityLevel, string> = {
-  good: "bg-emerald-500",
-  low: "bg-amber-500",
-  critical: "bg-red-500",
-  none: "bg-slate-300",
+  good: "bg-ok",
+  low: "bg-low",
+  critical: "bg-crit",
+  none: "bg-border",
 };
 
 export const LEVEL_TEXT_CLASS: Record<AvailabilityLevel, string> = {
-  good: "text-emerald-700",
-  low: "text-amber-700",
-  critical: "text-red-600",
-  none: "text-slate-400",
+  good: "text-[oklch(0.42_0.09_155)]",
+  low: "text-[oklch(0.5_0.11_65)]",
+  critical: "text-[oklch(0.5_0.18_27)]",
+  none: "text-muted-foreground",
 };
 
 export const LEVEL_LABEL: Record<AvailabilityLevel, string> = {

@@ -113,7 +113,7 @@ export function TransferForm({ hospitals }: { hospitals: Hospital[] }) {
         </Field>
       </div>
       {donorRow && (
-        <p className={short ? "text-xs font-medium text-amber-700" : "text-xs text-muted-foreground"}>
+        <p className={short ? "text-xs font-medium text-[oklch(0.5_0.11_65)]" : "text-xs text-muted-foreground"}>
           Donor currently has {donorRow.available} free of {donorRow.total}.
           {short && " Approval will fail unless more units become free."}
         </p>

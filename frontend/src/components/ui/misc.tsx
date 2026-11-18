@@ -2,19 +2,20 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+/** Status label: small square tag with a leading dot. Colour carries meaning, never decoration. */
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
+  "inline-flex items-center gap-1.5 rounded-sm px-1.5 py-px text-[11px] font-medium whitespace-nowrap before:size-1.5 before:shrink-0 before:rounded-full before:content-['']",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary/10 text-teal-800",
-        secondary: "border-transparent bg-secondary text-secondary-foreground",
-        outline: "text-foreground",
-        critical: "border-red-200 bg-red-50 text-red-700",
-        serious: "border-amber-200 bg-amber-50 text-amber-800",
-        stable: "border-emerald-200 bg-emerald-50 text-emerald-700",
-        info: "border-blue-200 bg-blue-50 text-blue-700",
-        muted: "border-slate-200 bg-slate-100 text-slate-600",
+        default: "bg-accent text-accent-foreground before:bg-primary",
+        secondary: "bg-secondary text-secondary-foreground before:bg-muted-foreground",
+        outline: "border text-foreground before:hidden",
+        critical: "bg-crit/10 text-[oklch(0.45_0.17_27)] before:bg-crit",
+        serious: "bg-low/15 text-[oklch(0.45_0.1_65)] before:bg-low",
+        stable: "bg-ok/10 text-[oklch(0.42_0.09_155)] before:bg-ok",
+        info: "bg-accent text-accent-foreground before:bg-primary",
+        muted: "bg-secondary text-muted-foreground before:bg-muted-foreground/60",
       },
     },
     defaultVariants: { variant: "default" },
@@ -28,10 +29,10 @@ export function Badge({ className, variant, ...props }: BadgeProps) {
 }
 
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("animate-pulse rounded-md bg-slate-200/70", className)} {...props} />;
+  return <div className={cn("animate-pulse rounded-sm bg-secondary", className)} {...props} />;
 }
 
-/** Horizontal progress bar; value is a percentage 0..100. */
+/** Thin horizontal meter; value is a percentage 0..100. */
 export function Progress({
   value,
   className,
@@ -51,10 +52,10 @@ export function Progress({
       aria-valuemax={100}
       aria-valuenow={Math.round(v)}
       aria-label={label}
-      className={cn("relative h-2 w-full overflow-hidden rounded-full bg-slate-100", className)}
+      className={cn("relative h-1.5 w-full overflow-hidden rounded-[1px] bg-secondary", className)}
     >
       <div
-        className={cn("h-full rounded-full bg-primary transition-[width] duration-500 ease-out", indicatorClassName)}
+        className={cn("h-full bg-primary transition-[width] duration-500 ease-out", indicatorClassName)}
         style={{ width: `${v}%` }}
       />
     </div>
@@ -64,28 +65,28 @@ export function Progress({
 export function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
   return (
     <div className="relative w-full overflow-x-auto">
-      <table className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      <table className={cn("w-full caption-bottom text-[13px]", className)} {...props} />
     </div>
   );
 }
 export const THead = (p: React.HTMLAttributes<HTMLTableSectionElement>) => (
-  <thead {...p} className={cn("[&_tr]:border-b bg-slate-50/80", p.className)} />
+  <thead {...p} className={cn("[&_tr]:border-b [&_tr]:hover:bg-transparent", p.className)} />
 );
 export const TBody = (p: React.HTMLAttributes<HTMLTableSectionElement>) => (
   <tbody {...p} className={cn("[&_tr:last-child]:border-0", p.className)} />
 );
 export const TR = (p: React.HTMLAttributes<HTMLTableRowElement>) => (
-  <tr {...p} className={cn("border-b transition-colors hover:bg-slate-50/60", p.className)} />
+  <tr {...p} className={cn("border-b transition-colors hover:bg-background/70", p.className)} />
 );
 export const TH = (p: React.ThHTMLAttributes<HTMLTableCellElement>) => (
   <th
     {...p}
     className={cn(
-      "h-10 px-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap",
+      "h-8 px-3 text-left align-middle text-[11px] font-medium uppercase tracking-wider text-muted-foreground whitespace-nowrap",
       p.className,
     )}
   />
 );
 export const TD = (p: React.TdHTMLAttributes<HTMLTableCellElement>) => (
-  <td {...p} className={cn("px-3 py-2.5 align-middle", p.className)} />
+  <td {...p} className={cn("px-3 py-2 align-middle", p.className)} />
 );

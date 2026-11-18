@@ -1,23 +1,29 @@
 import { useState } from "react";
-import { ArrowRight, Check, Share2, X } from "lucide-react";
+import { ArrowRight, Check, Download, X } from "lucide-react";
+import { downloadCsv, stamp } from "@/lib/csv";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/form-controls";
 import { Skeleton, Table, TBody, TD, TH, THead, TR } from "@/components/ui/misc";
-import { ConfirmAction, EmptyState, ErrorState, PageHeader, ResourceIcon, TransferStatusBadge } from "@/components/common";
+import { ConfirmAction, EmptyState, ErrorState, PageHeader, TransferStatusBadge } from "@/components/common";
 import { TransferForm } from "@/components/sharing/TransferForm";
 import { useApproveTransfer, useHospitals, useRejectTransfer, useTransfers } from "@/hooks/queries";
 import { RESOURCE_LABELS, RESOURCE_LONG_LABELS, formatDateTime } from "@/lib/format";
 import type { Hospital, Transfer, TransferStatus } from "@/types/api";
 import type { ApiError } from "@/services/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 function Decision({ t, hospitals }: { t: Transfer; hospitals: Hospital[] }) {
   const approve = useApproveTransfer();
   const reject = useRejectTransfer();
+  const { canManageHospital } = useAuth();
   const busy = approve.isPending || reject.isPending;
   if (t.status !== "PENDING") {
     return <span className="text-xs text-muted-foreground">{t.resolvedAt ? formatDateTime(t.resolvedAt) : "-"}</span>;
+  }
+  if (!canManageHospital(t.donorHospitalId)) {
+    return <span className="text-xs text-muted-foreground">Awaiting donor decision</span>;
   }
   const donorRow = hospitals.find((h) => h.id === t.donorHospitalId)?.inventory.find((i) => i.resourceType === t.resourceType);
   return (
@@ -37,7 +43,7 @@ function Decision({ t, hospitals }: { t: Transfer; hospitals: Hospital[] }) {
               together in one transaction.
             </p>
             {donorRow && (
-              <p className={donorRow.available < t.quantity ? "font-medium text-red-600" : ""}>
+              <p className={donorRow.available < t.quantity ? "font-medium text-crit" : ""}>
                 Donor currently has {donorRow.available} free of {donorRow.total}.
               </p>
             )}
@@ -53,7 +59,7 @@ function Decision({ t, hospitals }: { t: Transfer; hospitals: Hospital[] }) {
       />
       <ConfirmAction
         trigger={
-          <Button size="sm" variant="outline" disabled={busy} className="text-red-600 hover:text-red-700">
+          <Button size="sm" variant="outline" disabled={busy} className="text-crit hover:text-crit">
             <X /> Reject
           </Button>
         }
@@ -79,13 +85,12 @@ export function ResourceSharingPage() {
   const list = (transfers.data ?? []).filter((t) => !statusFilter || t.status === statusFilter);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
-        icon={Share2}
-        title="Resource sharing"
+        title="Transfers"
         description="Hospitals request beds or equipment from each other; the donor approves or rejects."
       />
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+      <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="self-start">
           <CardHeader>
             <CardTitle>Request resources</CardTitle>
@@ -115,24 +120,37 @@ export function ResourceSharingPage() {
               onChange={(e) => setStatusFilter(e.target.value as TransferStatus | "")}
             >
               <option value="">All statuses</option>
-              <option value="PENDING">PENDING</option>
-              <option value="APPROVED">APPROVED</option>
-              <option value="REJECTED">REJECTED</option>
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
             </NativeSelect>
+            <Button
+              variant="outline"
+              disabled={!list.length}
+              onClick={() =>
+                downloadCsv(
+                  `medisync-transfers-${stamp()}.csv`,
+                  ["id", "requester", "donor", "resource", "quantity", "status", "note", "created_at", "resolved_at"],
+                  list.map((t) => [t.id, t.requesterHospitalName, t.donorHospitalName, t.resourceType, t.quantity, t.status, t.note, t.createdAt, t.resolvedAt]),
+                )
+              }
+            >
+              <Download /> Export CSV
+            </Button>
           </CardHeader>
-          <CardContent className="px-0">
+          <CardContent className="p-0">
             {transfers.isLoading ? (
-              <div className="space-y-2 px-5">
+              <div className="space-y-2 p-4">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-10" />
                 ))}
               </div>
             ) : transfers.isError ? (
-              <div className="px-5">
+              <div className="p-4">
                 <ErrorState message={(transfers.error as Error).message} onRetry={() => transfers.refetch()} />
               </div>
             ) : list.length === 0 ? (
-              <EmptyState icon={Share2} title="No sharing requests" description="Requests between hospitals will be listed here." />
+              <EmptyState title="No sharing requests" description="Requests between hospitals will be listed here." />
             ) : (
               <Table>
                 <THead>
@@ -149,25 +167,25 @@ export function ResourceSharingPage() {
                 <TBody>
                   {list.map((t) => (
                     <TR key={t.id}>
-                      <TD className="font-mono text-xs text-muted-foreground">#{t.id}</TD>
+                      <TD className="num text-xs text-muted-foreground">{t.id}</TD>
                       <TD>
-                        <div className="flex flex-wrap items-center gap-1.5 text-sm">
-                          <span className="font-medium text-slate-900">{t.requesterHospitalName}</span>
-                          <ArrowRight className="size-3.5 text-slate-400" aria-label="from donor" />
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium text-foreground">{t.requesterHospitalName}</span>
+                          <ArrowRight className="size-3.5 text-muted-foreground" aria-label="from donor" />
                           <span>{t.donorHospitalName}</span>
                         </div>
                         {t.note && <p className="max-w-[260px] truncate text-xs text-muted-foreground" title={t.note}>{t.note}</p>}
                       </TD>
                       <TD>
                         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                          <ResourceIcon type={t.resourceType} /> {RESOURCE_LABELS[t.resourceType]}
+                          {RESOURCE_LABELS[t.resourceType]}
                         </span>
                       </TD>
-                      <TD className="text-right font-semibold tabular-nums">{t.quantity}</TD>
+                      <TD className="num text-right font-medium">{t.quantity}</TD>
                       <TD>
                         <TransferStatusBadge status={t.status} />
                       </TD>
-                      <TD className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(t.createdAt)}</TD>
+                      <TD className="num whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(t.createdAt)}</TD>
                       <TD>
                         <Decision t={t} hospitals={hospitals.data ?? []} />
                       </TD>

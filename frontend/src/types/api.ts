@@ -21,7 +21,44 @@ export type ActivityType =
   | "INVENTORY_UPDATED"
   | "TRANSFER_REQUESTED"
   | "TRANSFER_APPROVED"
-  | "TRANSFER_REJECTED";
+  | "TRANSFER_REJECTED"
+  | "USER_MANAGEMENT";
+
+export const ROLES = ["ADMIN", "DISPATCHER", "HOSPITAL_STAFF"] as const;
+export type Role = (typeof ROLES)[number];
+
+export interface User {
+  id: number;
+  username: string;
+  fullName: string;
+  role: Role;
+  hospitalId: number | null;
+  hospitalName: string | null;
+  enabled: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface LoginResponse {
+  token: string;
+  expiresAt: string;
+  user: User;
+}
+
+export interface CreateUser {
+  username: string;
+  fullName: string;
+  password: string;
+  role: Role;
+  hospitalId: number | null;
+}
+
+export interface UpdateUser {
+  fullName: string;
+  role: Role;
+  hospitalId: number | null;
+  enabled: boolean;
+}
 
 export interface Inventory {
   id: number;
@@ -70,6 +107,7 @@ export interface Activity {
   actionType: ActivityType;
   message: string;
   referenceId: number | null;
+  actor: string | null;
   createdAt: string;
 }
 

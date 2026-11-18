@@ -1,121 +1,200 @@
 import { useMemo, useState } from "react";
-import { BedDouble, Building2, Clock, LayoutDashboard, MapPin, Phone, Route, Users, type LucideIcon } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useHospitals, useStats } from "@/hooks/queries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NativeSelect, Label } from "@/components/ui/form-controls";
 import { Skeleton } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
-import { AvailabilityBar } from "@/components/AvailabilityBar";
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { NetworkMap } from "@/components/NetworkMap";
 import { EmptyState, ErrorState, PageHeader } from "@/components/common";
-import { LEVEL_LABEL, RESOURCE_LABELS, availabilityLevel, type AvailabilityLevel } from "@/lib/format";
-import { RESOURCE_TYPES, type Hospital, type ResourceType, type Stats } from "@/types/api";
+import {
+  LEVEL_BAR_CLASS,
+  LEVEL_LABEL,
+  LEVEL_TEXT_CLASS,
+  RESOURCE_LABELS,
+  availabilityLevel,
+  availabilityPercent,
+  type AvailabilityLevel,
+} from "@/lib/format";
+import { RESOURCE_TYPES, type Hospital, type Inventory, type ResourceType, type Stats } from "@/types/api";
 import { cn } from "@/lib/utils";
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  tone,
-  loading,
-}: {
-  icon: LucideIcon;
+/* ---------- KPI strip ---------- */
+
+function Kpi({ label, value, unit, sub, alert, loading }: {
   label: string;
   value: string;
+  unit?: string;
   sub?: string;
-  tone: string;
+  alert?: boolean;
   loading?: boolean;
 }) {
   return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          {loading ? (
-            <Skeleton className="mt-2 h-8 w-24" />
-          ) : (
-            <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>
-          )}
-          {sub && !loading && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
-        </div>
-        <div className={cn("rounded-lg p-2.5", tone)}>
-          <Icon className="size-5" aria-hidden />
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function SummaryCards({ stats, loading }: { stats?: Stats; loading: boolean }) {
-  const pct = stats && stats.totalCapacity > 0 ? Math.round((stats.totalAvailable / stats.totalCapacity) * 100) : 0;
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard
-        icon={BedDouble}
-        label="Available resources"
-        value={stats ? `${stats.totalAvailable} / ${stats.totalCapacity}` : "-"}
-        sub={stats ? `${pct}% of all beds and equipment free` : undefined}
-        tone="bg-teal-50 text-teal-700"
-        loading={loading}
-      />
-      <StatCard
-        icon={Users}
-        label="Active admissions"
-        value={String(stats?.activeAdmissions ?? "-")}
-        sub="Requests with a reserved bed"
-        tone="bg-blue-50 text-blue-700"
-        loading={loading}
-      />
-      <StatCard
-        icon={Clock}
-        label="Waiting patients"
-        value={String(stats?.waitingPatients ?? "-")}
-        sub="Pending in the priority queue"
-        tone={stats && stats.waitingPatients > 0 ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-500"}
-        loading={loading}
-      />
-      <StatCard
-        icon={Route}
-        label="Avg. allocation distance"
-        value={stats?.averageDistanceKm != null ? `${stats.averageDistanceKm.toFixed(1)} km` : "-"}
-        sub="Straight-line, all allocations"
-        tone="bg-indigo-50 text-indigo-600"
-        loading={loading}
-      />
+    <div className="min-w-0 px-4 py-3.5">
+      <p className="eyebrow">{label}</p>
+      {loading ? (
+        <Skeleton className="mt-2 h-7 w-20" />
+      ) : (
+        <p className={cn("num mt-1 text-[26px] font-medium leading-8", alert ? "text-crit" : "text-foreground")}>
+          {value}
+          {unit && <span className="ml-1 text-sm font-normal text-muted-foreground">{unit}</span>}
+        </p>
+      )}
+      {sub && !loading && <p className="mt-0.5 truncate text-xs text-muted-foreground">{sub}</p>}
     </div>
   );
 }
 
+function KpiStrip({ stats, loading }: { stats?: Stats; loading: boolean }) {
+  const pct = stats && stats.totalCapacity > 0 ? Math.round((stats.totalAvailable / stats.totalCapacity) * 100) : 0;
+  return (
+    <Card className="grid grid-cols-2 divide-x divide-y sm:divide-y-0 lg:grid-cols-4 [&>*:nth-child(3)]:border-l-0 sm:[&>*:nth-child(3)]:border-l">
+      <Kpi
+        label="Free capacity"
+        value={stats ? String(stats.totalAvailable) : "-"}
+        unit={stats ? `/ ${stats.totalCapacity}` : undefined}
+        sub={stats ? `${pct}% of beds and equipment` : undefined}
+        loading={loading}
+      />
+      <Kpi label="Active admissions" value={String(stats?.activeAdmissions ?? "-")} sub="Patients holding a bed" loading={loading} />
+      <Kpi
+        label="Waiting"
+        value={String(stats?.waitingPatients ?? "-")}
+        sub="In the priority queue"
+        alert={!!stats && stats.waitingPatients > 0}
+        loading={loading}
+      />
+      <Kpi
+        label="Avg. distance"
+        value={stats?.averageDistanceKm != null ? stats.averageDistanceKm.toFixed(1) : "-"}
+        unit={stats?.averageDistanceKm != null ? "km" : undefined}
+        sub="Straight line, all allocations"
+        loading={loading}
+      />
+    </Card>
+  );
+}
+
+/* ---------- Bed board ---------- */
+
+function BoardCell({ row, dim }: { row?: Inventory; dim: boolean }) {
+  if (!row) return <td className="px-3 py-2.5 text-muted-foreground">-</td>;
+  const level = availabilityLevel(row.available, row.total);
+  const pct = availabilityPercent(row.available, row.total);
+  return (
+    <td
+      className={cn("px-3 py-2.5 align-middle transition-opacity", dim && "opacity-25")}
+      title={`${RESOURCE_LABELS[row.resourceType]}: ${row.available} of ${row.total} free · ${LEVEL_LABEL[level]}`}
+    >
+      <div className="num flex items-baseline justify-end gap-0.5 text-[13px]">
+        <span className={cn("font-medium", level === "critical" ? LEVEL_TEXT_CLASS.critical : "text-foreground")}>
+          {row.available}
+        </span>
+        <span className="text-muted-foreground">/{row.total}</span>
+      </div>
+      <div className="mt-1.5 h-1 w-full bg-secondary" aria-hidden>
+        <div className={cn("h-full", LEVEL_BAR_CLASS[level])} style={{ width: `${pct}%` }} />
+      </div>
+    </td>
+  );
+}
+
+function BedBoard({
+  rows,
+  types,
+  level,
+}: {
+  rows: Hospital[];
+  types: ResourceType[];
+  level: AvailabilityLevel | "";
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] text-[13px]">
+        <thead>
+          <tr className="border-b">
+            <th className="h-8 px-4 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Hospital
+            </th>
+            {types.map((t) => (
+              <th key={t} className="h-8 w-[13%] px-3 text-right text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                {RESOURCE_LABELS[t]}
+              </th>
+            ))}
+            <th className="h-8 w-[11%] px-4 text-right text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Total
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((h) => (
+            <tr key={h.id} className="border-b last:border-0 hover:bg-background/60">
+              <td className="px-4 py-2.5">
+                <p className="font-medium text-foreground">{h.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {h.area} ·{" "}
+                  <a className="num hover:text-foreground" href={`tel:${h.phone}`}>
+                    {h.phone}
+                  </a>
+                </p>
+              </td>
+              {types.map((t) => {
+                const row = h.inventory.find((i) => i.resourceType === t);
+                const dim = !!level && (!row || availabilityLevel(row.available, row.total) !== level);
+                return <BoardCell key={t} row={row} dim={dim} />;
+              })}
+              <td className="num px-4 py-2.5 text-right">
+                <span className="font-medium">{h.totalAvailable}</span>
+                <span className="text-muted-foreground">/{h.totalCapacity}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ---------- Capacity chart ---------- */
+
 function CapacityChart({ stats }: { stats?: Stats }) {
   const data = (stats?.byResource ?? []).map((r) => ({
     name: RESOURCE_LABELS[r.resourceType],
-    Available: r.available,
+    Free: r.available,
     Occupied: r.total - r.available,
   }));
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Capacity by resource type</CardTitle>
-        <CardDescription>Available and occupied units across all hospitals</CardDescription>
+      <CardHeader className="flex-row items-center justify-between">
+        <div>
+          <CardTitle>Network capacity by resource</CardTitle>
+          <CardDescription>Free and occupied units across all hospitals</CardDescription>
+        </div>
+        <div className="flex gap-4 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="size-2 bg-primary" /> Free
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="size-2 bg-[#d4d6dc]" /> Occupied
+          </span>
+        </div>
       </CardHeader>
-      <CardContent className="h-64">
+      <CardContent className="h-60">
         {!stats ? (
           <Skeleton className="h-full" />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 4, right: 8, left: -12, bottom: 0 }} barCategoryGap="28%">
-              <CartesianGrid vertical={false} stroke="#e2e8f0" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 12 }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fill: "#94a3b8", fontSize: 12 }} />
+            <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barCategoryGap="34%">
+              <CartesianGrid vertical={false} stroke="#ececef" />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#6b6f7b", fontSize: 12 }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: "#9a9ea8", fontSize: 11, fontFamily: "IBM Plex Mono" }} />
               <Tooltip
-                cursor={{ fill: "rgba(148,163,184,0.12)" }}
-                contentStyle={{ borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 12 }}
+                cursor={{ fill: "rgba(0,0,0,0.03)" }}
+                contentStyle={{ borderRadius: 4, border: "1px solid #e4e5e9", fontSize: 12, boxShadow: "none" }}
               />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: "#475569" }} />
-              <Bar dataKey="Available" stackId="a" fill="#0d9488" stroke="#fff" strokeWidth={2} />
-              <Bar dataKey="Occupied" stackId="a" fill="#cbd5e1" stroke="#fff" strokeWidth={2} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Free" stackId="a" fill="#2b4a8c" />
+              <Bar dataKey="Occupied" stackId="a" fill="#d4d6dc" />
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -124,36 +203,13 @@ function CapacityChart({ stats }: { stats?: Stats }) {
   );
 }
 
-function HospitalCard({ hospital, types }: { hospital: Hospital; types: ResourceType[] }) {
-  const rows = hospital.inventory.filter((i) => types.includes(i.resourceType));
-  return (
-    <Card className="transition-shadow hover:shadow-md">
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-[15px]">{hospital.name}</CardTitle>
-          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-600">
-            {hospital.totalAvailable}/{hospital.totalCapacity}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <MapPin className="size-3" aria-hidden /> {hospital.area}
-          </span>
-          <a className="inline-flex items-center gap-1 hover:text-teal-700" href={`tel:${hospital.phone}`}>
-            <Phone className="size-3" aria-hidden /> {hospital.phone}
-          </a>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-2.5">
-        {rows.map((i) => (
-          <AvailabilityBar key={i.id} type={i.resourceType} available={i.available} total={i.total} />
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
+/* ---------- Page ---------- */
 
-const LEVEL_FILTERS: AvailabilityLevel[] = ["good", "low", "critical"];
+const LEVELS: { value: AvailabilityLevel; label: string }[] = [
+  { value: "good", label: "Adequate (≥ 40% free)" },
+  { value: "low", label: "Low (15–40%)" },
+  { value: "critical", label: "Critical (< 15%)" },
+];
 
 export function DashboardPage() {
   const hospitals = useHospitals();
@@ -162,38 +218,34 @@ export function DashboardPage() {
   const [typeFilter, setTypeFilter] = useState<ResourceType | "">("");
   const [levelFilter, setLevelFilter] = useState<AvailabilityLevel | "">("");
 
-  const visible = useMemo(() => {
-    const list = hospitals.data ?? [];
-    return list
+  const types = typeFilter ? [typeFilter] : [...RESOURCE_TYPES];
+  const rows = useMemo(() => {
+    return (hospitals.data ?? [])
       .filter((h) => !hospitalFilter || String(h.id) === hospitalFilter)
-      .map((h) => {
-        const types = RESOURCE_TYPES.filter((t) => {
-          if (typeFilter && t !== typeFilter) return false;
-          if (!levelFilter) return true;
-          const row = h.inventory.find((i) => i.resourceType === t);
-          return row ? availabilityLevel(row.available, row.total) === levelFilter : false;
-        });
-        return { hospital: h, types };
-      })
-      .filter((x) => x.types.length > 0);
+      .filter(
+        (h) =>
+          !levelFilter ||
+          types.some((t) => {
+            const r = h.inventory.find((i) => i.resourceType === t);
+            return r && availabilityLevel(r.available, r.total) === levelFilter;
+          }),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hospitals.data, hospitalFilter, typeFilter, levelFilter]);
 
   const filtered = hospitalFilter || typeFilter || levelFilter;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        icon={LayoutDashboard}
-        title="Live dashboard"
-        description="Real-time availability of emergency, ICU, ventilator, general and oxygen-supported beds."
-      />
-      <SummaryCards stats={stats.data} loading={stats.isLoading} />
+    <div className="space-y-5">
+      <PageHeader title="Bed board" description="Live availability of emergency, ICU, ventilator, general and oxygen beds across the network." />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-6 min-w-0">
-          <Card className="p-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="flex min-w-[180px] flex-1 flex-col gap-1.5">
+      <KpiStrip stats={stats.data} loading={stats.isLoading} />
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-5">
+          <Card>
+            <div className="flex flex-wrap items-end gap-3 border-b px-4 py-3">
+              <div className="flex min-w-[170px] flex-1 flex-col gap-1.5">
                 <Label htmlFor="f-hospital">Hospital</Label>
                 <NativeSelect id="f-hospital" value={hospitalFilter} onChange={(e) => setHospitalFilter(e.target.value)}>
                   <option value="">All hospitals</option>
@@ -204,8 +256,8 @@ export function DashboardPage() {
                   ))}
                 </NativeSelect>
               </div>
-              <div className="flex min-w-[150px] flex-1 flex-col gap-1.5">
-                <Label htmlFor="f-type">Resource type</Label>
+              <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
+                <Label htmlFor="f-type">Resource</Label>
                 <NativeSelect id="f-type" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as ResourceType | "")}>
                   <option value="">All resources</option>
                   {RESOURCE_TYPES.map((t) => (
@@ -215,13 +267,13 @@ export function DashboardPage() {
                   ))}
                 </NativeSelect>
               </div>
-              <div className="flex min-w-[150px] flex-1 flex-col gap-1.5">
+              <div className="flex min-w-[140px] flex-1 flex-col gap-1.5">
                 <Label htmlFor="f-level">Availability</Label>
                 <NativeSelect id="f-level" value={levelFilter} onChange={(e) => setLevelFilter(e.target.value as AvailabilityLevel | "")}>
                   <option value="">Any level</option>
-                  {LEVEL_FILTERS.map((l) => (
-                    <option key={l} value={l}>
-                      {l === "good" ? "Adequate (40% or more free)" : l === "low" ? "Low (15% to 40%)" : "Critical (below 15%)"}
+                  {LEVELS.map((l) => (
+                    <option key={l.value} value={l.value}>
+                      {l.label}
                     </option>
                   ))}
                 </NativeSelect>
@@ -235,49 +287,45 @@ export function DashboardPage() {
                     setLevelFilter("");
                   }}
                 >
-                  Clear
+                  Clear filters
                 </Button>
               )}
             </div>
-            <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+
+            {hospitals.isLoading ? (
+              <div className="space-y-2 p-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10" />
+                ))}
+              </div>
+            ) : hospitals.isError ? (
+              <div className="p-4">
+                <ErrorState message={(hospitals.error as Error).message} onRetry={() => hospitals.refetch()} />
+              </div>
+            ) : rows.length === 0 ? (
+              <EmptyState title="No matching hospitals" description="Change or clear the filters." />
+            ) : (
+              <BedBoard rows={rows} types={types} level={levelFilter} />
+            )}
+
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t px-4 py-2 text-[11px] text-muted-foreground">
+              <span>Free / total units.</span>
               {(["good", "low", "critical"] as const).map((l) => (
                 <span key={l} className="inline-flex items-center gap-1.5">
-                  <span
-                    className={cn(
-                      "size-2.5 rounded-full",
-                      l === "good" ? "bg-emerald-500" : l === "low" ? "bg-amber-500" : "bg-red-500",
-                    )}
-                  />
-                  {LEVEL_LABEL[l]} {l === "good" ? "≥ 40%" : l === "low" ? "15-40%" : "< 15%"}
+                  <span className={cn("h-1 w-3", LEVEL_BAR_CLASS[l])} />
+                  {LEVEL_LABEL[l]} {l === "good" ? "≥ 40%" : l === "low" ? "15–40%" : "< 15%"}
                 </span>
               ))}
             </div>
           </Card>
 
-          {hospitals.isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-52 rounded-xl" />
-              ))}
-            </div>
-          ) : hospitals.isError ? (
-            <ErrorState message={(hospitals.error as Error).message} onRetry={() => hospitals.refetch()} />
-          ) : visible.length === 0 ? (
-            <Card>
-              <EmptyState icon={Building2} title="No matching resources" description="Change or clear the filters." />
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {visible.map(({ hospital, types }) => (
-                <HospitalCard key={hospital.id} hospital={hospital} types={types} />
-              ))}
-            </div>
-          )}
-
-          <CapacityChart stats={stats.data} />
+          <div className="grid gap-5 2xl:grid-cols-2">
+            <NetworkMap />
+            <CapacityChart stats={stats.data} />
+          </div>
         </div>
 
-        <ActivityFeed className="lg:sticky lg:top-36 lg:self-start" />
+        <ActivityFeed className="xl:sticky xl:top-6 xl:self-start" />
       </div>
     </div>
   );

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Building2, Loader2, Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Label, NativeSelect } from "@/components/ui/form-controls";
 import { Progress, Skeleton } from "@/components/ui/misc";
-import { EmptyState, ErrorState, PageHeader, ResourceIcon } from "@/components/common";
+import { EmptyState, ErrorState, PageHeader } from "@/components/common";
 import { useHospitalInventory, useHospitals, useUpdateInventory } from "@/hooks/queries";
 import {
   LEVEL_BAR_CLASS,
@@ -19,6 +19,7 @@ import {
 import type { Inventory } from "@/types/api";
 import type { ApiError } from "@/services/api";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 /** Client-side mirror of the server rules; the server re-checks everything. */
 export function validateCounts(totalRaw: string, availableRaw: string, activeAllocations: number): string | null {
@@ -66,16 +67,17 @@ function InventoryRow({ row }: { row: Inventory }) {
 
   const fieldId = `inv-${row.id}`;
   return (
-    <div className="grid gap-3 rounded-xl border bg-white p-4 md:grid-cols-[200px_1fr_auto] md:items-center">
+    <div className="grid gap-3 border-b px-4 py-3.5 last:border-0 md:grid-cols-[240px_minmax(0,320px)_1fr] md:items-start">
       <div>
-        <p className="flex items-center gap-2 font-medium text-slate-900">
-          <ResourceIcon type={row.resourceType} /> {RESOURCE_LONG_LABELS[row.resourceType]}
-        </p>
+        <p className="text-[13px] font-medium text-foreground">{RESOURCE_LONG_LABELS[row.resourceType]}</p>
         <div className="mt-2 flex items-center gap-2">
-          <Progress value={availabilityPercent(row.available, row.total)} indicatorClassName={LEVEL_BAR_CLASS[level]} className="w-28" label="Current availability" />
-          <span className={cn("text-xs font-semibold", LEVEL_TEXT_CLASS[level])}>{LEVEL_LABEL[level]}</span>
+          <Progress value={availabilityPercent(row.available, row.total)} indicatorClassName={LEVEL_BAR_CLASS[level]} className="w-24" label="Current availability" />
+          <span className="num text-xs">
+            {row.available}/{row.total}
+          </span>
+          <span className={cn("text-xs", LEVEL_TEXT_CLASS[level])}>{LEVEL_LABEL[level]}</span>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-[11px] text-muted-foreground">
           Updated {formatDateTime(row.updatedAt)}
           {row.activeAllocations > 0 && ` · ${row.activeAllocations} active allocation(s)`}
         </p>
@@ -86,6 +88,7 @@ function InventoryRow({ row }: { row: Inventory }) {
           <Input
             id={`${fieldId}-total`}
             inputMode="numeric"
+            className="num"
             value={total}
             onChange={(e) => setTotal(e.target.value)}
             aria-invalid={error ? true : undefined}
@@ -96,6 +99,7 @@ function InventoryRow({ row }: { row: Inventory }) {
           <Input
             id={`${fieldId}-available`}
             inputMode="numeric"
+            className="num"
             value={available}
             onChange={(e) => setAvailable(e.target.value)}
             aria-invalid={error ? true : undefined}
@@ -107,7 +111,7 @@ function InventoryRow({ row }: { row: Inventory }) {
           </p>
         )}
       </div>
-      <Button onClick={save} disabled={!dirty || !!error || update.isPending} className="md:w-28">
+      <Button onClick={save} disabled={!dirty || !!error || update.isPending} variant={dirty ? "default" : "outline"} className="md:mt-[18px] md:w-24 md:justify-self-end">
         {update.isPending ? <Loader2 className="animate-spin" /> : <Save />}
         Save
       </Button>
@@ -117,7 +121,9 @@ function InventoryRow({ row }: { row: Inventory }) {
 
 export function HospitalAdminPage() {
   const hospitals = useHospitals();
-  const [hospitalId, setHospitalId] = useState<number | null>(null);
+  const { user } = useAuth();
+  const lockedHospital = user?.role === "HOSPITAL_STAFF" ? user.hospitalId : null;
+  const [hospitalId, setHospitalId] = useState<number | null>(lockedHospital);
 
   useEffect(() => {
     if (hospitalId == null && hospitals.data?.length) setHospitalId(hospitals.data[0].id);
@@ -127,26 +133,19 @@ export function HospitalAdminPage() {
   const hospital = hospitals.data?.find((h) => h.id === hospitalId);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
-        icon={Building2}
-        title="Hospital admin"
-        description="Maintain the total and available count of each resource. Every row is saved on its own."
-      />
-      <Card>
-        <CardHeader className="flex-row flex-wrap items-end justify-between gap-4">
-          <div>
-            <CardTitle>{hospital?.name ?? "Select a hospital"}</CardTitle>
-            <CardDescription>
-              {hospital ? `${hospital.area} · ${hospital.phone}` : "Choose the hospital whose inventory you maintain."}
-            </CardDescription>
-          </div>
+        title="Inventory"
+        description="Maintain total and available units per resource. Each row saves on its own."
+        actions={
           <div className="flex min-w-[240px] flex-col gap-1.5">
             <Label htmlFor="admin-hospital">Hospital</Label>
             <NativeSelect
               id="admin-hospital"
               value={hospitalId ?? ""}
               onChange={(e) => setHospitalId(e.target.value ? Number(e.target.value) : null)}
+              disabled={lockedHospital != null}
+              title={lockedHospital != null ? "Hospital staff can only manage their own hospital" : undefined}
             >
               {hospitals.data?.map((h) => (
                 <option key={h.id} value={h.id}>
@@ -155,25 +154,46 @@ export function HospitalAdminPage() {
               ))}
             </NativeSelect>
           </div>
+        }
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle>{hospital?.name ?? "Select a hospital"}</CardTitle>
+          <CardDescription>
+            {hospital ? (
+              <>
+                {hospital.area} · <span className="num">{hospital.phone}</span>
+              </>
+            ) : (
+              "Choose the hospital whose inventory you maintain."
+            )}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <div>
           {hospitals.isError ? (
-            <ErrorState message={(hospitals.error as Error).message} onRetry={() => hospitals.refetch()} />
+            <div className="p-4">
+              <ErrorState message={(hospitals.error as Error).message} onRetry={() => hospitals.refetch()} />
+            </div>
           ) : inventory.isLoading || hospitals.isLoading ? (
-            Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)
+            <div className="space-y-2 p-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-16" />
+              ))}
+            </div>
           ) : inventory.isError ? (
-            <ErrorState message={(inventory.error as Error).message} onRetry={() => inventory.refetch()} />
+            <div className="p-4">
+              <ErrorState message={(inventory.error as Error).message} onRetry={() => inventory.refetch()} />
+            </div>
           ) : !inventory.data?.length ? (
             <EmptyState title="No inventory rows" description="This hospital has no resources recorded." />
           ) : (
             inventory.data.map((row) => <InventoryRow key={row.id} row={row} />)
           )}
-          <p className="pt-1 text-xs text-muted-foreground">
-            Rules: counts are whole numbers ≥ 0, available ≤ total, and occupied units (total − available) can never be
-            fewer than the patients the system has allocated here. Added free capacity is offered to waiting patients
-            immediately.
-          </p>
-        </CardContent>
+        </div>
+        <p className="border-t px-4 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+          Counts are whole numbers ≥ 0 and available ≤ total. Occupied units (total − available) can never be fewer than
+          the patients allocated here. Added free capacity is offered to waiting patients immediately.
+        </p>
       </Card>
     </div>
   );

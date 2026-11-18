@@ -165,7 +165,7 @@ export function EmergencyForm({ onResult }: { onResult: (r: AllocationResult) =>
         </Field>
       </div>
 
-      <fieldset className="space-y-3 rounded-lg border border-dashed border-slate-300 p-3">
+      <fieldset className="space-y-3 rounded-sm border bg-background/60 p-3">
         <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Patient location</legend>
         <div className="flex flex-wrap items-end gap-2">
           <Field label="Patient area" htmlFor="area" className="min-w-[170px] flex-1">

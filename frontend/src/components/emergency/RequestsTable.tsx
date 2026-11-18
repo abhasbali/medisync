@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ClipboardList, LogOut, Search, XCircle } from "lucide-react";
+import { Download, LogOut, Search, XCircle } from "lucide-react";
+import { downloadCsv, stamp } from "@/lib/csv";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, NativeSelect } from "@/components/ui/form-controls";
@@ -51,7 +52,7 @@ function RowActions({ r }: { r: EmergencyRequest }) {
       )}
       <ConfirmAction
         trigger={
-          <Button size="sm" variant="outline" disabled={busy} className="text-red-600 hover:text-red-700">
+          <Button size="sm" variant="outline" disabled={busy} className="text-crit hover:text-crit">
             <XCircle /> Cancel
           </Button>
         }
@@ -83,13 +84,27 @@ export function RequestsTable() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ClipboardList className="size-4 text-teal-600" /> Emergency requests
-        </CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle>Emergency requests</CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!data?.length}
+            onClick={() =>
+              downloadCsv(
+                `medisync-requests-${stamp()}.csv`,
+                ["id", "patient", "age", "condition", "severity", "resource", "status", "hospital", "distance_km", "queue_position", "created_at"],
+                (data ?? []).map((r) => [r.id, r.patientName, r.patientAge, r.patientCondition, r.severity, r.resourceType, r.status, r.hospitalName, r.distanceKm, r.queuePosition, r.createdAt]),
+              )
+            }
+          >
+            <Download /> Export CSV
+          </Button>
+        </div>
         <CardDescription>All requests, newest first. Discharge or cancel to release beds.</CardDescription>
         <div className="mt-2 flex flex-wrap gap-2">
           <div className="relative min-w-[200px] flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-slate-400" aria-hidden />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input
               aria-label="Search requests"
               placeholder="Search patient, condition, hospital or #id"
@@ -116,15 +131,15 @@ export function RequestsTable() {
           </NativeSelect>
         </div>
       </CardHeader>
-      <CardContent className="px-0 pb-2">
+      <CardContent className="p-0">
         {isLoading ? (
-          <div className="space-y-2 px-5">
+          <div className="space-y-2 p-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-10" />
             ))}
           </div>
         ) : isError ? (
-          <div className="px-5">
+          <div className="p-4">
             <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
           </div>
         ) : !data?.length ? (
@@ -149,9 +164,9 @@ export function RequestsTable() {
             <TBody>
               {data.map((r) => (
                 <TR key={r.id}>
-                  <TD className="font-mono text-xs text-muted-foreground">#{r.id}</TD>
+                  <TD className="num text-xs text-muted-foreground">{r.id}</TD>
                   <TD>
-                    <p className="font-medium text-slate-900">{r.patientName}</p>
+                    <p className="font-medium text-foreground">{r.patientName}</p>
                     <p className="max-w-[180px] truncate text-xs text-muted-foreground" title={r.patientCondition}>
                       {r.patientAge} yrs · {r.patientCondition}
                     </p>
@@ -168,7 +183,7 @@ export function RequestsTable() {
                     {r.hospitalName ? (
                       <>
                         <p className="whitespace-nowrap">{r.hospitalName}</p>
-                        <p className="text-xs text-muted-foreground">{formatKm(r.distanceKm)}</p>
+                        <p className="num text-xs text-muted-foreground">{formatKm(r.distanceKm)}</p>
                       </>
                     ) : (
                       <span className="text-xs text-muted-foreground">
@@ -179,7 +194,7 @@ export function RequestsTable() {
                   <TD>
                     <RequestStatusBadge status={r.status} />
                   </TD>
-                  <TD className="whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(r.createdAt)}</TD>
+                  <TD className="num whitespace-nowrap text-xs text-muted-foreground">{formatDateTime(r.createdAt)}</TD>
                   <TD>
                     <RowActions r={r} />
                   </TD>

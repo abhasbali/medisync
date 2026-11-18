@@ -1,11 +1,9 @@
 import type { ReactNode } from "react";
 import {
-  Activity as ActivityIcon,
   AlertTriangle,
   BedDouble,
   BedSingle,
   HeartPulse,
-  Inbox,
   RefreshCw,
   Siren,
   Wind,
@@ -38,15 +36,14 @@ export const RESOURCE_ICONS: Record<ResourceType, LucideIcon> = {
 
 export function ResourceIcon({ type, className }: { type: ResourceType; className?: string }) {
   const Icon = RESOURCE_ICONS[type];
-  return <Icon className={cn("size-4 text-slate-500", className)} aria-hidden />;
+  return <Icon className={cn("size-3.5 text-muted-foreground", className)} aria-hidden />;
 }
 
 export function SeverityBadge({ severity }: { severity: Severity }) {
   const variant = severity === "CRITICAL" ? "critical" : severity === "SERIOUS" ? "serious" : "stable";
   return (
     <Badge variant={variant}>
-      {severity === "CRITICAL" && <AlertTriangle className="size-3" aria-hidden />}
-      {SEVERITY_LABELS[severity]}
+            {SEVERITY_LABELS[severity]}
     </Badge>
   );
 }
@@ -58,19 +55,20 @@ const REQUEST_STATUS_VARIANT: Record<RequestStatus, "info" | "serious" | "muted"
   CANCELLED: "muted",
 };
 
+const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+
 export function RequestStatusBadge({ status }: { status: RequestStatus }) {
-  return <Badge variant={REQUEST_STATUS_VARIANT[status]}>{status}</Badge>;
+  return <Badge variant={REQUEST_STATUS_VARIANT[status]}>{titleCase(status)}</Badge>;
 }
 
 export function TransferStatusBadge({ status }: { status: TransferStatus }) {
   const variant = status === "APPROVED" ? "stable" : status === "REJECTED" ? "muted" : "serious";
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={variant}>{titleCase(status)}</Badge>;
 }
 
 export function EmptyState({
   title,
   description,
-  icon: Icon = Inbox,
   className,
 }: {
   title: string;
@@ -79,11 +77,8 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-2 px-4 py-10 text-center", className)}>
-      <div className="rounded-full bg-slate-100 p-3">
-        <Icon className="size-5 text-slate-400" aria-hidden />
-      </div>
-      <p className="text-sm font-medium text-slate-700">{title}</p>
+    <div className={cn("flex flex-col items-center justify-center gap-1 px-4 py-10 text-center", className)}>
+      <p className="text-[13px] font-medium text-foreground">{title}</p>
       {description && <p className="max-w-sm text-xs text-muted-foreground">{description}</p>}
     </div>
   );
@@ -91,15 +86,12 @@ export function EmptyState({
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div
-      role="alert"
-      className="flex flex-col items-center gap-3 rounded-xl border border-red-200 bg-red-50/60 px-4 py-8 text-center"
-    >
-      <AlertTriangle className="size-6 text-red-500" aria-hidden />
-      <p className="text-sm font-medium text-red-700">{message}</p>
+    <div role="alert" className="flex items-center gap-3 rounded-sm border border-crit/30 bg-crit/5 px-3 py-2.5">
+      <AlertTriangle className="size-4 shrink-0 text-crit" aria-hidden />
+      <p className="flex-1 text-[13px] text-foreground">{message}</p>
       {onRetry && (
         <Button size="sm" variant="outline" onClick={onRetry}>
-          <RefreshCw /> Try again
+          <RefreshCw /> Retry
         </Button>
       )}
     </div>
@@ -143,16 +135,23 @@ export function ConfirmAction({
   );
 }
 
-export function PageHeader({ title, description, icon: Icon = ActivityIcon }: { title: string; description: string; icon?: LucideIcon }) {
+export function PageHeader({
+  title,
+  description,
+  actions,
+}: {
+  title: string;
+  description: string;
+  icon?: LucideIcon;
+  actions?: ReactNode;
+}) {
   return (
-    <div className="flex items-start gap-3">
-      <div className="mt-0.5 rounded-lg bg-teal-50 p-2 text-teal-700 ring-1 ring-teal-100">
-        <Icon className="size-5" aria-hidden />
-      </div>
+    <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-4">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">{title}</h1>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">{description}</p>
       </div>
+      {actions}
     </div>
   );
 }

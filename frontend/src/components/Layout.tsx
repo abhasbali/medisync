@@ -1,93 +1,182 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { Activity, Building2, HeartPulse, Info, LayoutDashboard, Share2, Siren } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { ArrowLeftRight, BarChart3, Building2, Hospital, LayoutGrid, LogOut, Menu, ScrollText, Siren, Users, X } from "lucide-react";
 import { useRealtime, type ConnectionStatus } from "@/contexts/RealtimeContext";
+import { ROLE_LABEL, useAuth } from "@/contexts/AuthContext";
+import type { Role } from "@/types/api";
 import { cn } from "@/lib/utils";
+import { AlertsBell } from "@/components/AlertsBell";
 
-const NAV = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+const NAV: { to: string; label: string; icon: typeof Siren; end?: boolean; roles?: Role[] }[] = [
+  { to: "/", label: "Bed board", icon: LayoutGrid, end: true },
+  { to: "/my-hospital", label: "My hospital", icon: Hospital, roles: ["HOSPITAL_STAFF"] },
   { to: "/emergency", label: "Emergency", icon: Siren },
-  { to: "/sharing", label: "Resource Sharing", icon: Share2 },
-  { to: "/admin", label: "Hospital Admin", icon: Building2 },
+  { to: "/sharing", label: "Transfers", icon: ArrowLeftRight },
+  { to: "/admin", label: "Inventory", icon: Building2, roles: ["ADMIN", "HOSPITAL_STAFF"] },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/users", label: "Users", icon: Users, roles: ["ADMIN"] },
+  { to: "/audit", label: "Audit log", icon: ScrollText, roles: ["ADMIN"] },
 ];
 
-const STATUS_STYLE: Record<ConnectionStatus, { label: string; dot: string; pill: string }> = {
-  live: { label: "Live", dot: "bg-emerald-500 animate-pulse-dot", pill: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-  reconnecting: { label: "Reconnecting", dot: "bg-amber-500 animate-pulse-dot", pill: "border-amber-200 bg-amber-50 text-amber-800" },
-  offline: { label: "Offline", dot: "bg-red-500", pill: "border-red-200 bg-red-50 text-red-700" },
+const STATUS: Record<ConnectionStatus, { label: string; dot: string }> = {
+  live: { label: "Live", dot: "bg-ok animate-pulse-dot" },
+  reconnecting: { label: "Reconnecting", dot: "bg-low animate-pulse-dot" },
+  offline: { label: "Offline", dot: "bg-crit" },
 };
 
-export function ConnectionBadge() {
+export function ConnectionBadge({ className }: { className?: string }) {
   const { status } = useRealtime();
-  const s = STATUS_STYLE[status];
+  const s = STATUS[status];
   return (
     <span
       role="status"
       aria-live="polite"
       title="Real-time WebSocket connection"
-      className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold", s.pill)}
+      className={cn("inline-flex items-center gap-1.5 text-xs font-medium", className)}
     >
-      <span className={cn("size-2 rounded-full", s.dot)} aria-hidden />
+      <span className={cn("size-1.5 rounded-full", s.dot)} aria-hidden />
       {s.label}
     </span>
   );
 }
 
-export function Layout() {
+/** Wordmark: a plain cross glyph and the product name. */
+function Wordmark() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-blue-600 text-white shadow-sm">
-              <HeartPulse className="size-5" aria-hidden />
-            </div>
-            <div>
-              <p className="text-lg font-bold leading-tight tracking-tight text-slate-900">
-                Medi<span className="text-teal-600">Sync</span> Live
-              </p>
-              <p className="text-xs text-muted-foreground">Real-Time Hospital Resource Management</p>
-            </div>
-          </div>
-          <ConnectionBadge />
-        </div>
-        <nav className="mx-auto max-w-7xl overflow-x-auto px-4 sm:px-6" aria-label="Main">
-          <ul className="flex gap-1 pb-2">
-            {NAV.map(({ to, label, icon: Icon, end }) => (
-              <li key={to}>
-                <NavLink
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    cn(
-                      "inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                      isActive ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-                    )
-                  }
-                >
-                  <Icon className="size-4" aria-hidden />
-                  {label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </header>
+    <Link to="/" className="flex items-center gap-2.5 text-white">
+      <svg viewBox="0 0 20 20" className="size-5" aria-hidden>
+        <rect x="7" y="1" width="6" height="18" rx="1" fill="currentColor" />
+        <rect x="1" y="7" width="18" height="6" rx="1" fill="currentColor" />
+      </svg>
+      <span className="text-[15px] font-semibold tracking-[-0.01em]">MediSync</span>
+    </Link>
+  );
+}
 
-      <div className="border-b border-amber-200 bg-amber-50">
-        <p className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-1.5 text-xs text-amber-900 sm:px-6">
-          <Info className="size-3.5 shrink-0" aria-hidden />
-          Academic demonstration prototype with synthetic data. Not a clinically validated or authorised emergency
-          dispatch system. No login or role enforcement.
-        </p>
+function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { user, logout, hasRole } = useAuth();
+  const nav = NAV.filter((n) => !n.roles || hasRole(...n.roles));
+  const initials = user?.fullName
+    .split(/\s+/)
+    .filter((w) => /^[A-Za-z]/.test(w))
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+
+  return (
+    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+      <div className="flex h-14 items-center justify-between px-4">
+        <Wordmark />
+        <AlertsBell />
+      </div>
+      <div className="px-4 pb-1">
+        <ConnectionBadge className="text-sidebar-muted" />
       </div>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <Outlet />
-      </main>
+      <nav className="flex-1 px-2 py-3" aria-label="Main">
+        <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-sidebar-muted">Operations</p>
+        <ul className="space-y-px">
+          {nav.map(({ to, label, icon: Icon, end }) => (
+            <li key={to}>
+              <NavLink
+                to={to}
+                end={end}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  cn(
+                    "relative flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-[13px] transition-colors",
+                    isActive
+                      ? "bg-sidebar-active font-medium text-white before:absolute before:inset-y-1.5 before:-left-2 before:w-0.5 before:bg-white"
+                      : "hover:bg-sidebar-active/60 hover:text-white",
+                  )
+                }
+              >
+                <Icon className="size-4 opacity-80" aria-hidden />
+                {label}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-      <footer className="mx-auto flex max-w-7xl items-center gap-2 px-4 pb-8 text-xs text-muted-foreground sm:px-6">
-        <Activity className="size-3.5" aria-hidden /> MediSync Live - Spring Boot, MySQL, STOMP WebSocket and React
-      </footer>
+      {user && (
+        <div className="border-t border-sidebar-border p-2">
+          <Link
+            to="/account"
+            onClick={onNavigate}
+            className="flex items-center gap-2.5 rounded-sm px-2 py-2 hover:bg-sidebar-active"
+            title="My account"
+          >
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-sidebar-active text-[11px] font-semibold text-white">
+              {initials || "?"}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-medium text-white">{user.fullName}</span>
+              <span className="block truncate text-[11px] text-sidebar-muted">
+                {user.hospitalName ?? ROLE_LABEL[user.role]}
+              </span>
+            </span>
+          </Link>
+          <button
+            type="button"
+            onClick={logout}
+            className="mt-px flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-[13px] hover:bg-sidebar-active hover:text-white"
+          >
+            <LogOut className="size-4 opacity-80" aria-hidden /> Sign out
+          </button>
+        </div>
+      )}
+      <p className="px-4 pb-3 text-[10px] leading-relaxed text-sidebar-muted">
+        Academic prototype · synthetic data. Not for clinical dispatch.
+      </p>
+    </div>
+  );
+}
+
+export function Layout() {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  useEffect(() => setOpen(false), [location.pathname]);
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 lg:block">
+        <Sidebar />
+      </aside>
+
+      {/* Mobile top bar + drawer */}
+      <header className="sticky top-0 z-30 flex h-12 items-center justify-between bg-sidebar px-4 lg:hidden">
+        <Wordmark />
+        <div className="flex items-center gap-3">
+          <ConnectionBadge className="text-sidebar-muted" />
+          <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" className="text-white">
+            <Menu className="size-5" />
+          </button>
+        </div>
+      </header>
+      {open && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} aria-hidden />
+          <div className="absolute inset-y-0 left-0 w-64">
+            <Sidebar onNavigate={() => setOpen(false)} />
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close menu"
+              className="absolute right-3 top-4 text-sidebar-muted hover:text-white"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className="lg:pl-56">
+        <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+          <Outlet />
+        </div>
+      </main>
     </div>
   );
 }
